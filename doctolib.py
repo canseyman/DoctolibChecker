@@ -29,6 +29,8 @@ def get_available_slots(site_info):
 
     available_slots = []
     for visit_motive in site_info["visit_motives"]:
+        if visit_motive['name'] != 'Dermatologie Sprechstunde': # TODO optionally remove this line
+            continue
         url = f"{site_info['base_url']}/availabilities.json?start_date={today}&visit_motive_ids={visit_motive['id']}&agenda_ids={visit_motive['agenda_ids']}&insurance_sector=public&practice_ids={visit_motive['practice_ids']}&destroy_temporary=true&limit=4"
 
         # Check not to call the same url too frequently
@@ -46,6 +48,13 @@ def get_available_slots(site_info):
             availabilities = list(filter(lambda availability: _is_valid_availability(site_info["domain"], availability), decoded['availabilities']))
             if len(availabilities) > 0:
                 available_slots.extend([{"date": availability["date"], "count": len(availability["slots"]), "type": visit_motive["name"]} for availability in availabilities])
+            else:
+                next_slot = decoded['next_slot'] # is in format '2022-12-07T09:15:00.000+01:00'
+                # convert to date using datetime.datetime.strptime
+                next_slot_date = datetime.datetime.strptime(next_slot, '%Y-%m-%dT%H:%M:%S.%f%z').date()
+
+                if next_slot_date < today_date.date() + datetime.timedelta(days=14):
+                    available_slots.append({"date": next_slot_date.strftime('%d-%m'),'type':'','count':''})
         else:
             logger.error(f"Failed to fetch \"{url}\", code {response.status_code}")
             logger.error(response.text)
